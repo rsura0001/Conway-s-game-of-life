@@ -1,24 +1,79 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import './App.css';
+import axios from 'axios';
 
 function App() {
-  const [row, setRow] = useState(30);
-  const [col, setCol] = useState(30);
-  const [liveColour, setLiveColour] = useState("#000000");
+
+  // all states 
+
+  const [row, setRow] = useState(100);
+  const [col, setCol] = useState(100);
+  const [liveColour, setLiveColour] = useState("#000");
   const [deadColour, setDeadColour] = useState("#ffffff");
-  const [intervalTime, setIntervalTime] = useState(1000);
+  const [generation, setgeneration] = useState(0)
+  const [intervalTime, setIntervalTime] = useState(300);
   const [board, setBoard] = useState(() => generateBoard(row, col));
   const [running, setRunning] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
 
+  const [form, setForm] = useState({
+    tempRow: row,
+    tempCol: col,
+    tempInterval: intervalTime,
+    tempLiveColour: liveColour,
+    tempDeadColour: deadColour
+
+  })
 
 
+  // dummy api response 
+
+  let apiResponse = {
+    size: {
+      width: 50,
+      height: 50,
+    },
+    livingcell: [
+      { x: 10, y: 10 },
+      { x: 11, y: 10 },
+      { x: 12, y: 10 },
+      { x: 13, y: 10 },
+      { x: 14, y: 10 },
+      { x: 20, y: 15 },
+      { x: 21, y: 15 },
+      { x: 22, y: 15 },
+      { x: 22, y: 16 },
+      { x: 22, y: 17 },
+      { x: 30, y: 30 },
+      { x: 31, y: 30 },
+      { x: 32, y: 30 },
+    ],
+  };
 
 
-  function generateBoard(rows, cols) {
+  const { tempRow, tempCol, tempInterval, tempLiveColour, tempDeadColour } = form;
+
+  function onChange(e) {
+    setForm(prevForm => ({ ...prevForm, [e.target.name]: e.target.value }))
+  }
+
+
+  function generateBoard(rows, cols, livingCells = []) {
     const newBoard = [];
-    for (let i = 0; i < rows; i++) {
-      newBoard.push(Array.from(Array(cols), () => Math.random() < 0.25 ? 1 : 0));
+    if (livingCells.length > 0) {
+      for (let i = 0; i < rows; i++) {
+        newBoard.push(Array.from(Array(cols), () => 0));
+      }
+      livingCells.forEach(({ x, y }) => {
+        if (x < rows && y < cols) {
+          newBoard[x][y] = 1;
+        }
+      });
+    }
+    else {
+      for (let i = 0; i < rows; i++) {
+        newBoard.push(Array.from(Array(cols), () => Math.random() < 0.25 ? 1 : 0));
+      }
     }
     return newBoard;
   }
@@ -26,27 +81,26 @@ function App() {
   const countLiveNeighbors = (board, x, y) => {
 
     let liveNeighbors = 0;
+    // if (((x + 0) > 0 && (x + 0) < row) && ((y + 1) > 0 && (y + 1) < col)) liveNeighbors += board[x + 0][y + 1]
+    // if (((x + 1) > 0 && (x + 1) < row) && ((y + 0) > 0 && (y + 0) < col)) liveNeighbors += board[x + 1][y + 0]
+    // if (((x + 0) > 0 && (x + 0) < row) && ((y - 1) > 0 && (y - 1) < col)) liveNeighbors += board[x + 0][y - 1]
+    // if (((x - 1) > 0 && (x - 1) < row) && ((y + 0) > 0 && (y + 0) < col)) liveNeighbors += board[x - 1][y + 0]
+    // if (((x + 1) > 0 && (x + 1) < row) && ((y + 1) > 0 && (y + 1) < col)) liveNeighbors += board[x + 1][y + 1]
+    // if (((x + 1) > 0 && (x + 1) < row) && ((y - 1) > 0 && (y - 1) < col)) liveNeighbors += board[x + 1][y - 1]
+    // if (((x - 1) > 0 && (x - 1) < row) && ((y + 1) > 0 && (y + 1) < col)) liveNeighbors += board[x - 1][y + 1]
+    // if (((x - 1) > 0 && (x - 1) < row) && ((y - 1) > 0 && (y - 1) < col)) liveNeighbors += board[x - 1][y - 1]
+    const neighbors = [
+      [0, 1], [1, 0], [0, -1], [-1, 0],
+      [1, 1], [1, -1], [-1, 1], [-1, -1],
+    ];
 
-    // directions.forEach(([dx, dy]) => {
-    //   const newX = x + dx;
-    //   const newY = y + dy;
-    //   if (newX >= 0 && newX < row && newY >= 0 && newY < col) {
-    //     liveNeighbors += board[newX][newY];
-    //   }
-    // });
-
-    if (((x + 0) > 0 && (x + 0) < row) && ((y + 1) > 0 && (y + 1) < col)) liveNeighbors += board[x + 0][y + 1]
-    if (((x + 1) > 0 && (x + 1) < row) && ((y + 0) > 0 && (y + 0) < col)) liveNeighbors += board[x + 1][y + 0]
-    if (((x + 0) > 0 && (x + 0) < row) && ((y - 1) > 0 && (y - 1) < col)) liveNeighbors += board[x + 0][y - 1]
-    if (((x - 1) > 0 && (x - 1) < row) && ((y + 0) > 0 && (y + 0) < col)) liveNeighbors += board[x - 1][y + 0]
-    if (((x + 1) > 0 && (x + 1) < row) && ((y + 1) > 0 && (y + 1) < col)) liveNeighbors += board[x + 1][y + 1]
-    if (((x + 1) > 0 && (x + 1) < row) && ((y - 1) > 0 && (y - 1) < col)) liveNeighbors += board[x + 1][y - 1]
-    if (((x - 1) > 0 && (x - 1) < row) && ((y + 1) > 0 && (y + 1) < col)) liveNeighbors += board[x - 1][y + 1]
-    if (((x - 1) > 0 && (x - 1) < row) && ((y - 1) > 0 && (y - 1) < col)) liveNeighbors += board[x - 1][y - 1]
-    // const directions = [
-    //   [0, 1], [1, 0], [0, -1], [-1, 0],
-    //   [1, 1], [1, -1], [-1, 1], [-1, -1],
-    // ];
+    neighbors.forEach(([dx, dy]) => {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < row && ny < col) {
+        liveNeighbors += board[nx][ny];
+      }
+    });
     return liveNeighbors;
   };
 
@@ -66,115 +120,219 @@ function App() {
         })
       );
     });
+    setgeneration(prev => prev + 1)
   }, [row, col]);
 
-  useEffect(() => {
-    if (!running) return;
+ 
 
-    const intervalId = setInterval(simulate, intervalTime);
-    console.log("component is render ?");
-    return () => clearInterval(intervalId);
+  const drawBoard = (ctx, board, cellSize, liveColour, deadColour) => {
+    board.forEach((row, i) => {
+      row.forEach((cell, j) => {
+        ctx.fillStyle = cell ? liveColour : deadColour;
+        ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
+      });
+    });
+  };
 
-  }, [running, simulate, intervalTime]);
-
-  const handleConfigSubmit = () => {
-    setBoard(generateBoard(row, col));
+  const handleConfigSubmit = (e) => {
+    e.preventDefault();
+    setRow(Number(tempRow));
+    setCol(Number(tempCol));
+    setLiveColour(tempLiveColour);
+    setDeadColour(tempDeadColour);
+    setIntervalTime(Number(tempInterval));
+    const newBoard = generateBoard(Number(tempRow), Number(tempCol))
+    setBoard(newBoard);
+    setRunning(false)
+    setgeneration(0);
     setShowConfig(false);
   };
 
+  const handleOpenConfig = () => {
+    setForm({
+      tempRow: row,
+      tempCol: col,
+      tempInterval: intervalTime,
+      tempLiveColour: liveColour,
+      tempDeadColour: deadColour,
+    });
+    setShowConfig(true);
+  };
+
+
+
+
+
+  
+// this useEfect is for start and stop and clean up
+
+useEffect(() => {
+  if (!running) return;
+
+  const intervalId = setInterval(simulate, intervalTime);
+  console.log("component is render ?");
+  return () => clearInterval(intervalId);
+
+}, [running, simulate, intervalTime]);
+
+
+// this useEfect is for generating canva gird 
+
+useEffect(() => {
+  const canvas = document.getElementById('boardCanvas');
+  const ctx = canvas.getContext('2d');
+  drawBoard(ctx, board, 5, liveColour, deadColour);
+}, [board, liveColour, deadColour]);
+
+
+// this usEfect for fatching data from server 
+
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+
+      const res = await axios.get('https://example.com/api/data');
+      const { size: { width, height }, livingcell } = data;
+
+      if (res.data) {
+        apiResponse = res.data;
+        setRow(width);
+        setCol(height);
+        setBoard(generateBoard(width, height, livingcell));
+      }
+
+    }
+    catch (error) {
+      console.error('Error fetching board data:', error);
+      // alert("api had no data , generating random board")
+      // setRow(apiResponse.size.width);
+      // setCol(apiResponse.size.height);
+      // setBoard(generateBoard(apiResponse.size.width, apiResponse.size.height, apiResponse.livingcell));
+    }
+  }
+  fetchData();
+}, [])
+
+
   return (
-    <div className="p-4">
-      <div
-        className="grid"
-        style={{
-          gridTemplateColumns: `repeat(${col}, 15px)`,
-          justifyContent: "center",
-          alignItems: "center"
-        }}
-      >
-        {board.map((row, i) =>
-          row.map((cell, k) => (
-            <div
-              key={`${i}-${k}`}
-              style={{
-                width: 20,
-                height: 20,
-                backgroundColor: cell ? liveColour : deadColour,
-                border: "2px solid black"
-              }}
-            ></div>
-          ))
-        )}
+
+    <div className="containerr">
+      {/* <div
+            className="board-container"
+            style={{
+              gridTemplateColumns: repeat(${col}, 5px),
+              gridTemplateRows: repeat(${row}, 5px),
+            }}
+          >
+            {board.map((row, i) =>
+              row.map((cell, k) => (
+                <div
+                  key={${i}-${k}}
+                  style={{
+                    width: "5px",
+                    hight: "5px",
+                    backgroundColor: cell ? liveColour : deadColour,
+                    border: "1px solid black",
+                  }}
+                ></div>
+              ))
+            )}
+          </div> */}
+      <div className="header">
+        CONWAY'S LIFE GAME
       </div>
 
-      <div className="mt-4 space-x-4">
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-          onClick={() => setRunning(true)}
+     
+      <div className="main-content">
+        <div className="outer-container"
+          style={{
+            width: '580px',  
+            height: '520px', 
+            overflowX: 'scroll', 
+            overflowY: 'scroll', 
+            whiteSpace: 'nowrap', 
+          }}
         >
-          Start
-        </button>
-        <button
-          className="bg-red-500 text-white px-4 py-2 rounded"
-          onClick={() => setRunning(false)}
-        >
-          Stop
-        </button>
-        <button
-          className="bg-yellow-500 text-white px-4 py-2 rounded"
-          onClick={simulate}
-        >
-          Simulate One Step
-        </button>
-        <button
-          className="bg-green-500 text-white px-4 py-2 rounded"
-          onClick={() => setShowConfig(true)}
-        >
-          Config
-        </button>
+          <canvas
+            id="boardCanvas"
+            width={col * 5} 
+            height={row * 5}
+            className="border"
+          ></canvas>
+        </div>
+
+        <div className="sidebar">
+          <div className="generation-counter">
+            Generation Counter <br /> {generation}
+          </div>
+
+          <div className="button-container">
+            <div className="button"  style={{ backgroundColor: running ? "red" : "green" ,color:"white"}} 
+        onClick={() => setRunning(!running)}>
+              {running ? "Stop" : "Start"}
+            </div>
+            <div className="button" onClick={handleOpenConfig}>
+              Configure
+            </div>
+            <div className="button" onClick={simulate}>
+              Quick Next
+            </div>
+          </div>
+        </div>
       </div>
+
+
 
       {showConfig && (
-        <div onClick={() => { setShowConfig(false) }} className="fixed inset-0 bg-gray-800 bg-opacity-75 flex justify-center items-center">
+        <div onClick={() => setShowConfig(false)} className="fixed inset-0 bg-gray-800 bg-opacity-75 flex justify-center items-center">
           <div onClick={(e) => e.stopPropagation()} className="bg-white p-16 rounded shadow-lg">
             <h2 className="text-lg font-semibold mb-4">Configuration</h2>
-            <form>
+            <form onSubmit={handleConfigSubmit}>
               <div className="mb-4">
                 <label className="block mb-2">Grid Height (rows):</label>
                 <input
-                  type="number"
+                  type="Number"
                   className="border rounded w-full p-2"
-                  value={row}
-                  onChange={(e) => setRow(Number(e.target.value))}
+                  value={tempRow}
+                  name="tempRow"
+
+                  onChange={onChange}
                 />
+                <p className="text-sm text-gray-600">Current Value: {row}</p>
               </div>
 
-              <div className="mb-4">
+            <div className="mb-4">
                 <label className="block mb-2">Grid Width (columns):</label>
                 <input
-                  type="number"
+                  type="Number"
                   className="border rounded w-full p-2"
-                  value={col}
-                  onChange={(e) => setCol(Number(e.target.value))}
+                  value={tempCol}
+                  name='tempCol'
+
+                  onChange={onChange}
+                />
+                <p className="text-sm text-gray-600">Current Value: {col}</p>
+              </div>
+
+              <div className="mb-4 flex items-center">
+                <label className="block mb-2 mr-4">Live Cell Color:</label>
+                <input
+                  type="color" id="color" name="tempLiveColour"
+
+                  value={tempLiveColour}
+                  onChange={onChange}
+
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="block mb-2">Live Cell Color:</label>
+              <div className="mb-4 flex items-center">
+                <label className="block mb-2 mr-4">Dead Cell Color:</label>
                 <input
-                  type="color"
-                  className="w-full h-10 border rounded"
-                  value={liveColour}
-                  onChange={(e) => setLiveColour(e.target.value)}
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block mb-2">Dead Cell Color:</label>
-                <input
-                  type="color"
-                  className="w-full h-10 border rounded"
-                  value={deadColour}
-                  onChange={(e) => setDeadColour(e.target.value)}
+                  type="color" id="color" name="tempDeadColour"
+
+                  value={tempDeadColour}
+                  onChange={onChange}
+
                 />
               </div>
 
@@ -183,8 +341,10 @@ function App() {
                 <input
                   type="number"
                   className="border rounded w-full p-2"
-                  value={intervalTime}
-                  onChange={(e) => setIntervalTime(Number(e.target.value))}
+                  value={tempInterval}
+                  name='tempInterval'
+
+                  onChange={onChange}
                 />
               </div>
 
@@ -197,7 +357,7 @@ function App() {
                 </button>
                 <button
                   className="bg-blue-500 text-white px-4 py-2 rounded"
-                  onClick={handleConfigSubmit}
+                  type='submit'
                 >
                   Save
                 </button>
@@ -207,7 +367,9 @@ function App() {
         </div>
       )}
     </div>
+
   );
+
 }
 
 export default App;
